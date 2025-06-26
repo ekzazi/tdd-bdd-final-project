@@ -26,8 +26,9 @@ While debugging just these tests it's convenient to use this:
 import os
 import logging
 import unittest
+from unittest.mock import MagicMock, patch
 from decimal import Decimal
-from service.models import Product, Category, db
+from service.models import Product, Category, db, DataValidationError
 from service import app
 from tests.factories import ProductFactory
 
@@ -186,3 +187,48 @@ class TestProductModel(unittest.TestCase):
         self.assertEqual(found.count(), count)
         for product in found:
             self.assertEqual(product.category, category)
+
+    def test_update_raises_error_when_id_is_none(self):
+        """Test that update raises DataValidationError when id is missing"""
+        product = ProductFactory()
+        product.id = None
+        product.create()
+        self.assertIsNotNone(product.id)
+        product.id = None
+        with self.assertRaises(DataValidationError) as context:
+            product.update()
+
+        self.assertIn("empty ID field", str(context.exception))
+
+    def test_deserialize_available_not_bool_raises_datavalidationerror(self):
+        """Test that available is not a bool key raises DataValidationError"""
+        product = Product()
+
+        # Provide a dictionary missing the 'name' key
+        bad_data = {
+            "name": "apple",
+            "description": "A test product",
+            "price": "19.99",
+            "available": "not bool!",
+            "category": "FOOD",
+        }
+
+        with self.assertRaises(DataValidationError) as context:
+            product.deserialize(bad_data)
+
+    def test_deserialize_missing_name_raises_datavalidationerror(self):
+        """Test that missing 'name' key raises DataValidationError"""
+        product = Product()
+
+        # Provide a dictionary missing the 'name' key
+        bad_data = {
+            "description": "A test product",
+            "price": "19.99",
+            "available": True,
+            "category": "FOOD",
+        }
+
+        with self.assertRaises(DataValidationError) as context:
+            product.deserialize(bad_data)
+
+        self.assertIn("missing name", str(context.exception))

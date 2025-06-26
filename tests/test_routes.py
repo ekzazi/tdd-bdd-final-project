@@ -28,6 +28,7 @@ import os
 import logging
 from decimal import Decimal
 from unittest import TestCase
+from unittest.mock import patch
 from service import app
 from service.common import status
 from service.models import db, init_db, Product
@@ -263,6 +264,22 @@ class TestProductRoutes(TestCase):
         # check the data just to be sure
         for product in data:
             self.assertEqual(product["available"], True)
+
+    @patch("service.routes.Product.find")  # patch the Product.find method
+    def test_update_product_not_found(self, mock_find):
+        """Test that updating a non-existent product returns 404"""
+        mock_find.return_value = None  # Simulate product not found
+
+        response = self.client.put(
+            f"/products/10",
+            json={"name": "Test Product"},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertIn(
+            f"Product with id '10' was not found",
+            response.get_data(as_text=True),
+        )
 
     ######################################################################
     # Utility functions
